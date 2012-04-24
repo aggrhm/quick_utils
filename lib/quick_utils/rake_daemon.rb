@@ -12,7 +12,7 @@ module QuickUtils
 			ENV['RAILS_ENV'] = @options[:environment].to_s
 			ENV['LOG_FILE'] = @@log_file
 
-			system "cd #{@@rails_root}; exec rake RAILS_ENV='#{@options[:environment].to_s}' LOG_FILE='#{@@log_file}' #{@@rake_task}"
+			exec "cd #{@@rails_root}; exec rake RAILS_ENV='#{@options[:environment].to_s}' LOG_FILE='#{@@log_file}' #{@@rake_task}"
 			
 		end
 	end
