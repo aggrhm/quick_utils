@@ -14,7 +14,7 @@ module QuickUtils
 
 			while true
 				# get num thins running
-				thin_num = `ps -ef | grep "thin" | grep "#{@@main_proc}" | grep -v "grep" | wc | awk '{print $1}'`.to_i
+				thin_num = `ps -ef | grep "thin" | grep "#{@@main_proc}-#{@options[:stage].to_s}" | grep -v "grep" | wc | awk '{print $1}'`.to_i
 				needs_restart = false
 				@@processes.each do |proc|
 					pnum = `ps -ef | grep "#{proc}" | grep -v "grep" | wc | awk '{print $1}'`.to_i
@@ -22,7 +22,7 @@ module QuickUtils
 				end
 				if thin_num == 0 || needs_restart
 					logger.info("Restarting #{main_proc} now...");
-					system "cd #{@@rails_root}; bundle exec script/restart;"
+					system "cd #{@@rails_root}; bundle exec script/restart #{@options[:stage].to_s};"
 				end
 				sleep @options[:delay]
 			end

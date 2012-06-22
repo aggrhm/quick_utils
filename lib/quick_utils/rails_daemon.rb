@@ -20,7 +20,7 @@ module QuickUtils
 		end
 		
 		def initialize(args)
-			@options = {:worker_count => 1, :environment => :development, :delay => 5}
+			@options = {:worker_count => 1, :environment => :development, :delay => 5, :stage => :development}
 			
 			optparse = OptionParser.new do |opts|
 				opts.banner = "Usage: #{File.basename($0)} [options] start|stop|restart|run"
@@ -40,6 +40,9 @@ module QuickUtils
 				end
 				opts.on('-d', '--delay=D', "Delay between rounds of work (seconds)") do |d|
 					@options[:delay] = d
+				end
+				opts.on('-s', '--stage=NAME', "Stage ([development]/staging/production)") do |s|
+					@options[:stage] = s
 				end
 			end
 			
