@@ -1,3 +1,5 @@
+require "active_support"
+
 require "quick_utils/version"
 require "quick_utils/thread_runner"
 require "quick_utils/rails_daemon"
