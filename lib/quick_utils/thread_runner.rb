@@ -5,11 +5,11 @@ module QuickUtils
       threads = []
       count = dataset.size
       nthreads = 1 if count < nthreads
-      bin_size = count / nthreads
+      bin_size = (count / nthreads.to_f).ceil
       puts "Dividing #{count} items into sizes of #{bin_size} for #{nthreads} threads."
       t = 0
       while t < nthreads do
-        subset = dataset[t*bin_size..t*bin_size+bin_size - 1]
+        subset = dataset[(t*bin_size)..(t*bin_size+bin_size - 1)]
         threads << Thread.new(subset) do |cs|
           yield cs
         end
