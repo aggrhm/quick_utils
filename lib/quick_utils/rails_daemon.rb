@@ -2,6 +2,7 @@ require 'rubygems'
 require 'daemons'
 require 'optparse'
 require 'logger'
+require 'fileutils'
 
 module QuickUtils
 	class RailsDaemon
@@ -51,9 +52,12 @@ module QuickUtils
 		end
 
 		def daemonize
+      pids_dir = File.join(@@rails_root, 'tmp', 'pids')
+      FileUtils.mkdir_p pids_dir
+
 			@options[:worker_count].times do |worker_index|
 				process_name = @options[:worker_count] == 1 ? @@proc_name : "#{@@proc_name}.#{worker_index}"
-				Daemons.run_proc(process_name, :dir => "#{@@rails_root}/tmp/pids", :dir_mode => :normal, :ARGV => @args) do |*args|
+				Daemons.run_proc(process_name, :dir => pids_dir, :dir_mode => :normal, :ARGV => @args) do |*args|
 					run process_name
 				end
 			end
