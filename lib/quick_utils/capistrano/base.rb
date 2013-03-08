@@ -7,8 +7,8 @@ Capistrano::Configuration.instance.load do
   _cset :user, 'login'
 
   set(:application) { "#{app_name}-#{deploy_env}" }
+  set(:rails_env) { deploy_env }
   _cset(:app_dir) { "/var/www/#{application}" }
-  _cset(:rails_env) { deploy_env }
   _cset :deploy_via, 'remote_cache'
   _cset :use_sudo, false
   set(:deploy_to) { app_dir }
