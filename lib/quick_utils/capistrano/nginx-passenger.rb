@@ -15,7 +15,14 @@ Capistrano::Configuration.instance.load do
       # nginx.restart is used instead.
       # nginx.reload_application
       nginx.restart
-      run "cd #{current_path} && ./script/restart #{deploy_env}"
+      jobs.restart
+    end
+  end
+
+  namespace :jobs do
+    desc "Restart job processes"
+    task :restart, :roles => :app, :except => {:no_release => true} do
+      run "cd #{current_path} && ./script/restart_jobs #{deploy_env}"
     end
   end
 
