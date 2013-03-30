@@ -5,10 +5,11 @@ Capistrano::Configuration.instance.load do
   _cset(:app_name) { abort("Please specify application name") }
   _cset(:deploy_env) { abort("Please specify deployment stage") }
   _cset :user, 'login'
+  _cset :www_dir, '/var/www'
 
   set(:application) { "#{app_name}-#{deploy_env}" }
   set(:rails_env) { deploy_env }
-  _cset(:app_dir) { "/var/www/#{application}" }
+  _cset(:app_dir) { "#{www_dir}/#{application}" }
   _cset :deploy_via, 'remote_cache'
   _cset :use_sudo, false
   set(:deploy_to) { app_dir }

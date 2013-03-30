@@ -18,13 +18,6 @@ Capistrano::Configuration.instance.load do
     end
   end
 
-  namespace :jobs do
-    desc "Restart job processes"
-    task :restart, :roles => :app, :except => {:no_release => true} do
-      run "cd #{current_path} && ./script/restart_jobs #{deploy_env}"
-    end
-  end
-
   namespace :nginx do
 
     desc "Create the application deployment directory under /var/www"
