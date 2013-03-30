@@ -15,7 +15,6 @@ Capistrano::Configuration.instance.load do
       # nginx.restart is used instead.
       # nginx.reload_application
       nginx.restart
-      jobs.restart
     end
   end
 
