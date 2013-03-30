@@ -52,6 +52,20 @@ Capistrano::Configuration.instance.load do
     script
     
   end
+
+  def duplicate_unicorn
+    script = <<-END
+      if #{unicorn_is_running?}; then
+        echo "Duplicating Unicorn...";
+        #{unicorn_send_signal('USR2')};
+      else
+        #{start_unicorn}
+      fi;
+    END
+
+    script
+  end
+  
     
 
   namespace :unicorn do
@@ -73,8 +87,7 @@ Capistrano::Configuration.instance.load do
     end
 
     task :restart, :roles => :app, :except => { :no_release => true } do
-      graceful_stop
-      start
+      run duplicate_unicorn
     end
 
   end
