@@ -101,12 +101,7 @@ module QuickUtils
       end
 
       # handle signals
-      Signal.trap("QUIT") do
-        self.shutdown
-      end
-      Signal.trap("TERM") do
-        self.shutdown
-      end
+      self.handle_signals
 
       loop do
         if @state == :up
@@ -166,6 +161,25 @@ module QuickUtils
       exec "cd #{@options[:root_dir]}; bundle exec rake RAILS_ENV='#{@options[:environment].to_s}' LOG_FILE='#{self.log_file}' #{task}"
     end
 
+    def handle_signals
+      Signal.trap("QUIT") {
+        @logger.info "Received SIGQUIT. Shutting down."
+        self.shutdown
+      }
+      Signal.trap("INT") {
+        @logger.info "Received SIGINT. Shutting down."
+        self.shutdown
+      }
+      Signal.trap("TERM") {
+        @logger.info "Received SIGTERM. Shutting down."
+        self.shutdown
+      }
+      Signal.trap("HUP") { 
+        @logger.info "Received SIGHUP. Shutting down."
+        self.shutdown
+      }
+    end
+
     def shutdown
       @logger.info 'Received signal to shutdown. Stopping workers...'
       # stop workers
@@ -222,10 +236,6 @@ module QuickUtils
 
     def delete_pid_file
       File.delete(self.pid_file)
-    end
-
-    at_exit do
-      @logger.info "Exiting master."
     end
 
   end
