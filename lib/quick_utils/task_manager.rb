@@ -89,6 +89,7 @@ module QuickUtils
 
       # fork master and save pid
       puts "Starting #{@process_name}... done."
+      Signal.trap 'HUP', 'IGNORE'   # ignore hup for now
       Process.daemon
       self.save_pid_file
 
