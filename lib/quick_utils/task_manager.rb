@@ -82,7 +82,10 @@ module QuickUtils
 
     def start
       # check if pidfile is running
-      abort "Task is running with pid #{self.pid}." if self.pid_is_running?
+      if self.pid_is_running?
+        puts "Task is running with pid #{self.pid}."
+        return
+      end
 
       # fork master and save pid
       puts "Starting #{@process_name}... done."
@@ -119,7 +122,10 @@ module QuickUtils
     end
 
     def stop
-      abort "No task running." if !self.pid_is_running?
+      if !self.pid_is_running?
+        puts "No task running."
+        return
+      end
 
       # send signal
       Process.kill "QUIT", self.pid
