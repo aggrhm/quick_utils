@@ -158,7 +158,7 @@ module QuickUtils
         exit!
       end
       @workers << pid
-      @logger.info "Spawned worker with pid #{pid}..."
+      @logger.info "Spawned worker with pid #{pid}."
       return pid
     end
 
@@ -222,6 +222,10 @@ module QuickUtils
 
     def delete_pid_file
       File.delete(self.pid_file)
+    end
+
+    at_exit do
+      @logger.info "Exiting master."
     end
 
   end
