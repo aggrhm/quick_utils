@@ -1,6 +1,7 @@
 require "active_support"
 
 require "quick_utils/version"
+require "quick_utils/task_manager"
 require "quick_utils/thread_runner"
 require "quick_utils/rails_daemon"
 require "quick_utils/rake_daemon"

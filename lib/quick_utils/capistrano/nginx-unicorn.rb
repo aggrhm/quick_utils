@@ -4,7 +4,6 @@ Capistrano::Configuration.instance.load do
   _cset :unicorn_binary, "unicorn"
   _cset :unicorn_config, "#{current_path}/config/unicorn.rb"
   _cset :unicorn_pid_file, "#{current_path}/tmp/pids/unicorn.pid"
-  _cset(:deployer) { user }   # deployer must have sudo privileges
 
   namespace :deploy do
     task :start do ; end
