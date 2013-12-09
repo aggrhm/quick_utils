@@ -5,6 +5,17 @@ require 'logger'
 module QuickUtils
   class TaskManager
 
+    DURATIONS = {
+      second: 1,
+      seconds: 1,
+      minute: 60,
+      minutes: 60,
+      hour: 3600,
+      hours: 3600,
+      day: 86400,
+      days: 86400
+    }
+
     def self.run(process_name, args = ARGV, &block)
       t = TaskManager.new(process_name, args, &block)
     end
@@ -14,6 +25,11 @@ module QuickUtils
       @workers = []
       @options = {:worker_count => 1, :environment => :development, :delay => 5, :root_dir => Dir.pwd}
       class << @options
+        def add_task(int_num, int_units, &task)
+          self[:tasks] ||= []
+          interval = int_num * DURATIONS[int_units.to_sym]
+          self[:tasks] << {fn: task, interval: interval, last_run_at: nil, next_run_at: Time.now}
+        end
         def method_missing(m, *args)
           self[m.to_s.gsub('=', '').to_sym] = args[0]
         end
@@ -53,6 +69,7 @@ module QuickUtils
       # additional opts
       @options[:pid_dir] ||= File.join(@options[:root_dir], 'tmp', 'pids')
       @options[:log_dir] ||= File.join(@options[:root_dir], 'log')
+
     end
 
     def prepare_logger
@@ -61,6 +78,11 @@ module QuickUtils
 
     def options
       @options
+    end
+
+    def load_rails
+      ENV['RAILS_ENV'] = @options[:environment].to_s
+      require File.join(@options[:root_dir], 'config', 'environment')
     end
 
     def handle_command
@@ -75,7 +97,12 @@ module QuickUtils
     end
 
     def run
-      if @options[:rake_task]
+      # load rails
+      self.load_rails if @options[:load_rails]
+
+      if @options[:tasks]
+        self.run_tasks(@options[:tasks])
+      elsif @options[:rake_task]
         self.run_rake_task(@options[:rake_task])
       end
     end
@@ -160,6 +187,31 @@ module QuickUtils
 
     def run_rake_task(task)
       exec "cd #{@options[:root_dir]}; bundle exec rake RAILS_ENV='#{@options[:environment].to_s}' LOG_FILE='#{self.log_file}' #{task}"
+    end
+
+    def run_tasks(tasks)
+      # setup logger
+      Rails.logger = Logger.new(self.log_file)
+      Moped.logger = nil if defined?(Moped)
+      Rails.logger.info "Starting #{@process_name} task manager for #{@options[:environment]}"
+
+      # loop ready tasks
+      loop do
+        tasks.each do |task|
+          if task[:next_run_at] < Time.now
+            begin
+              task[:fn].call
+            rescue Exception => e
+              Rails.logger.info e
+              Rails.logger.info e.backtrace.join("\n\t")
+            ensure
+              task[:last_run_at] = Time.now
+              task[:next_run_at] = Time.now + task[:interval]
+            end
+          end
+        end
+        sleep 1
+      end
     end
 
     def handle_signals
@@ -247,7 +299,21 @@ end
 # TaskManager.run("job_processor") do |config|
 #   config.worker_count = 3
 #   config.root_dir = ...
+#   config.load_rails = true
+#
+#   -- for rake task
 #   config.rake_task = "quick_jobs:process"
+#
+#   -- for ruby methods
+#   config.add_task (3, :seconds) do 
+#     Job.process_jobs
+#   end
+#
+#   config.add_task (1, :days) do
+#     Subscription.process_active_expired
+#   end
+#
+#   ]
 # end
 #
 #

@@ -10,4 +10,24 @@ require "quick_utils/job"
 
 module QuickUtils
   # Your code goes here...
+
+  def self.unit_of_work(&block)
+
+    work = lambda {
+      begin
+        block.call
+      rescue Exception => e
+        if defined? Rails
+          Rails.logger.info e
+          Rails.logger.info e.backtrace.join("\n\t")
+        end
+      end
+    }
+
+    if defined?(MongoMapper)
+      MongoMapper::Plugins::IdentityMap.without(&work)
+    elsif defined?(Mongoid)
+      Mongoid::unit_of_work({disable: :all}, &work)
+    end
+  end
 end
