@@ -36,9 +36,24 @@ module QuickUtils
       end
       block.call(@options) if block
       self.process_options(args)
-      self.prepare_logger
       self.handle_command
     end
+
+    ## ACCESSORS
+    
+    def options
+      @options
+    end
+
+    def master_logger
+      @master_logger ||= Logger.new(self.out_log_file)
+    end
+
+    def logger
+      @logger ||= Logger.new(self.log_file)
+    end
+
+    ## ACTIONS
 
     def process_options(args)
       
@@ -61,6 +76,9 @@ module QuickUtils
         opts.on('-d', '--delay=D', "Delay between rounds of work (seconds)") do |d|
           @options[:delay] = d
         end
+        opts.on('-t', '--test', "Run in test mode") do
+          @options[:test_mode] = @options[:debug] = true
+        end
       end
       
       # If no arguments, give help screen
@@ -70,14 +88,6 @@ module QuickUtils
       @options[:pid_dir] ||= File.join(@options[:root_dir], 'tmp', 'pids')
       @options[:log_dir] ||= File.join(@options[:root_dir], 'log')
 
-    end
-
-    def prepare_logger
-      @logger = Logger.new(self.out_log_file)
-    end
-
-    def options
-      @options
     end
 
     def load_rails
@@ -123,7 +133,7 @@ module QuickUtils
       # spawn workers
       @state = :up
       $0 = "#{@process_name} : master"
-      @logger.info "Started master with pid #{Process.pid}"
+      master_logger.info "Started master with pid #{Process.pid}"
       @options[:worker_count].times do |worker_num|
         pid = self.spawn_worker
       end
@@ -135,7 +145,7 @@ module QuickUtils
         if @state == :up
           done_pid = Process.wait
           sleep 3
-          @logger.info "Worker #{done_pid} exited. Spawning new worker..."
+          master_logger.info "Worker #{done_pid} exited. Spawning new worker..."
           @workers.delete(done_pid)
           # spawn new worker
           self.spawn_worker
@@ -172,7 +182,7 @@ module QuickUtils
     ## WORKER HELPERS
 
     def spawn_worker
-      @logger.info "Spawning new worker..."
+      master_logger.info "Spawning new worker..."
       pid = fork
       if pid.nil?
         # we are in the child here
@@ -181,7 +191,7 @@ module QuickUtils
         exit!
       end
       @workers << pid
-      @logger.info "Spawned worker with pid #{pid}."
+      master_logger.info "Spawned worker with pid #{pid}."
       return pid
     end
 
@@ -191,19 +201,19 @@ module QuickUtils
 
     def run_tasks(tasks)
       # setup logger
-      Rails.logger = Logger.new(self.log_file)
+      Rails.logger = self.logger
       Moped.logger = nil if defined?(Moped)
-      Rails.logger.info "Starting #{@process_name} task manager for #{@options[:environment]}"
+      self.logger.info "Starting #{@process_name} task manager for #{@options[:environment]}"
 
       # loop ready tasks
       loop do
         tasks.each do |task|
           if task[:next_run_at] < Time.now
             begin
-              task[:fn].call
+              task[:fn].call(self)
             rescue Exception => e
-              Rails.logger.info e
-              Rails.logger.info e.backtrace.join("\n\t")
+              logger.info e.message
+              logger.info e.backtrace.join("\n\t")
             ensure
               task[:last_run_at] = Time.now
               task[:next_run_at] = Time.now + task[:interval]
@@ -216,25 +226,25 @@ module QuickUtils
 
     def handle_signals
       Signal.trap("QUIT") {
-        @logger.info "Received SIGQUIT. Shutting down."
+        master_logger.info "Received SIGQUIT. Shutting down."
         self.shutdown
       }
       Signal.trap("INT") {
-        @logger.info "Received SIGINT. Shutting down."
+        master_logger.info "Received SIGINT. Shutting down."
         self.shutdown
       }
       Signal.trap("TERM") {
-        @logger.info "Received SIGTERM. Shutting down."
+        master_logger.info "Received SIGTERM. Shutting down."
         self.shutdown
       }
       Signal.trap("HUP") { 
-        @logger.info "Received SIGHUP. Shutting down."
+        master_logger.info "Received SIGHUP. Shutting down."
         self.shutdown
       }
     end
 
     def shutdown
-      @logger.info 'Received signal to shutdown. Stopping workers...'
+      master_logger.info 'Received signal to shutdown. Stopping workers...'
       # stop workers
       @state = :closing
       @workers.each do |pid|
@@ -243,7 +253,7 @@ module QuickUtils
 
       # wait for them to close
       Process.waitall
-      @logger.info 'Workers stopped. Exiting.'
+      master_logger.info 'Workers stopped. Exiting.'
       exit
     end
 
