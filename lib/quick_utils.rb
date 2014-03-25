@@ -18,7 +18,7 @@ module QuickUtils
         block.call
       rescue Exception => e
         if defined? Rails
-          Rails.logger.info e
+          Rails.logger.info e.message
           Rails.logger.info e.backtrace.join("\n\t")
         end
       end
@@ -26,8 +26,10 @@ module QuickUtils
 
     if defined?(MongoMapper)
       MongoMapper::Plugins::IdentityMap.without(&work)
-    elsif defined?(Mongoid)
+    elsif defined?(Mongoid::unit_of_work)
       Mongoid::unit_of_work({disable: :all}, &work)
+    else
+      work.call
     end
   end
 end
