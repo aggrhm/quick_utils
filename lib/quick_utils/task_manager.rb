@@ -23,7 +23,7 @@ module QuickUtils
     def initialize(name, args, &block)
       @process_name = name
       @workers = []
-      @options = {:worker_count => 1, :environment => :development, :delay => 5, :root_dir => Dir.pwd}
+      @options = {:worker_count => 1, :environment => :development, :delay => 5, :root_dir => Dir.pwd, :daemon => true}
       class << @options
         def add_task(int_num, int_units, &task)
           self[:tasks] ||= []
@@ -46,11 +46,11 @@ module QuickUtils
     end
 
     def master_logger
-      @master_logger ||= Logger.new(self.out_log_file)
+      @master_logger ||= Logger.new(self.out_log_file, 1, 1024*1024)
     end
 
     def logger
-      @logger ||= Logger.new(self.log_file)
+      @logger ||= Logger.new(self.log_file, 1, 1024*1024)
     end
 
     ## ACTIONS
@@ -78,6 +78,9 @@ module QuickUtils
         end
         opts.on('-t', '--test', "Run in test mode") do
           @options[:test_mode] = @options[:debug] = true
+        end
+        opts.on('-D', '--no-daemon', "Run in foreground") do
+          @options[:daemon] = false
         end
       end
       
@@ -127,7 +130,7 @@ module QuickUtils
       # fork master and save pid
       puts "Starting #{@process_name}... done."
       Signal.trap 'HUP', 'IGNORE'   # ignore hup for now
-      Process.daemon
+      Process.daemon if @options[:daemon] == true
       self.save_pid_file
 
       # spawn workers
@@ -254,6 +257,7 @@ module QuickUtils
       # wait for them to close
       Process.waitall
       master_logger.info 'Workers stopped. Exiting.'
+      delete_pid_file
       exit
     end
 
