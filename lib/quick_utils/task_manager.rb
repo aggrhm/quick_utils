@@ -302,7 +302,7 @@ module QuickUtils
     end
 
     def delete_pid_file
-      File.delete(self.pid_file)
+      File.delete(self.pid_file) if File.exists?(self.pid_file)
     end
 
   end
