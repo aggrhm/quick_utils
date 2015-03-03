@@ -18,9 +18,11 @@ module QuickUtils
 
     def self.run(process_name, args = ARGV, &block)
       t = TaskManager.new(process_name, args, &block)
+      t.handle_command
+      return t
     end
 
-    def initialize(name, args, &block)
+    def initialize(name, args = ARGV, &block)
       @process_name = name
       @workers = []
       @options = {:worker_count => 1, :environment => :development, :delay => 5, :root_dir => Dir.pwd, :daemon => true}
@@ -36,7 +38,6 @@ module QuickUtils
       end
       block.call(@options) if block
       self.process_options(args)
-      self.handle_command
     end
 
     ## ACCESSORS
@@ -204,7 +205,7 @@ module QuickUtils
 
     def run_tasks(tasks)
       # setup logger
-      Rails.logger = self.logger
+      Rails.logger = self.logger if defined?(Rails)
       Moped.logger = nil if defined?(Moped)
       self.logger.info "Starting #{@process_name} task manager for #{@options[:environment]}"
 
@@ -214,7 +215,7 @@ module QuickUtils
           if task[:next_run_at] < Time.now
             begin
               task[:fn].call(self)
-            rescue Exception => e
+            rescue => e
               logger.info e.message
               logger.info e.backtrace.join("\n\t")
             ensure
