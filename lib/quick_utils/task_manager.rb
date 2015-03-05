@@ -25,6 +25,8 @@ module QuickUtils
     def initialize(name, args = ARGV, &block)
       @process_name = name
       @workers = []
+      @role = :master
+      @state = :starting
       @options = {:worker_count => 1, :environment => :development, :delay => 5, :root_dir => Dir.pwd, :daemon => true}
       class << @options
         def add_task(int_num, int_units, &task)
@@ -52,6 +54,10 @@ module QuickUtils
 
     def logger
       @logger ||= Logger.new(self.log_file, 1, 1024*1024)
+    end
+
+    def state
+      @state
     end
 
     ## ACTIONS
@@ -111,6 +117,7 @@ module QuickUtils
     end
 
     def run
+      @state = :running
       # load rails
       self.load_rails if @options[:load_rails]
 
@@ -124,7 +131,7 @@ module QuickUtils
     def start
       # check if pidfile is running
       if self.pid_is_running?
-        puts "Task is running with pid #{self.pid}."
+        puts "Task is already running with pid #{self.pid}."
         return
       end
 
@@ -134,38 +141,38 @@ module QuickUtils
       Process.daemon if @options[:daemon] == true
       self.save_pid_file
 
+      # handle signals
+      self.handle_signals
+
       # spawn workers
-      @state = :up
       $0 = "#{@process_name} : master"
       master_logger.info "Started master with pid #{Process.pid}"
       @options[:worker_count].times do |worker_num|
         pid = self.spawn_worker
       end
 
-      # handle signals
-      self.handle_signals
-
+      # watch workers
+      @state = :watching
       loop do
-        if @state == :up
-          done_pid = Process.wait
-          sleep 3
-          master_logger.info "Worker #{done_pid} exited. Spawning new worker..."
-          @workers.delete(done_pid)
-          # spawn new worker
-          self.spawn_worker
-        end
+        done_pid = Process.wait
+        sleep 3
+        master_logger.info "Worker #{done_pid} exited. Spawning new worker..."
+        @workers.delete(done_pid)
+        # spawn new worker
+        self.spawn_worker
       end
 
     end
 
     def stop
+      @state = :stopping
       if !self.pid_is_running?
         puts "No task running."
         return
       end
 
       # send signal
-      Process.kill "QUIT", self.pid
+      Process.kill "TERM", self.pid
       print "Stopping process #{self.pid}... "
 
       # check if still running
@@ -189,9 +196,11 @@ module QuickUtils
       master_logger.info "Spawning new worker..."
       pid = fork
       if pid.nil?
+        @role = :worker
         # we are in the child here
         $0 = "#{@process_name} : worker"
         self.run
+        master_logger.info "Worker run ended cleanly. Exiting."
         exit!
       end
       @workers << pid
@@ -211,6 +220,10 @@ module QuickUtils
 
       # loop ready tasks
       loop do
+        if @state != :running
+          master_logger.info "Stopping run loop cleanly..."
+          break
+        end
         tasks.each do |task|
           if task[:next_run_at] < Time.now
             begin
@@ -230,36 +243,42 @@ module QuickUtils
 
     def handle_signals
       Signal.trap("QUIT") {
-        master_logger.info "Received SIGQUIT. Shutting down."
+        master_logger.info "(#{@role.to_s}) Received SIGQUIT. Shutting down."
         self.shutdown
       }
       Signal.trap("INT") {
-        master_logger.info "Received SIGINT. Shutting down."
+        master_logger.info "(#{@role.to_s}) Received SIGINT. Shutting down."
         self.shutdown
       }
       Signal.trap("TERM") {
-        master_logger.info "Received SIGTERM. Shutting down."
+        master_logger.info "(#{@role.to_s}) Received SIGTERM. Shutting down."
         self.shutdown
       }
       Signal.trap("HUP") { 
-        master_logger.info "Received SIGHUP. Shutting down."
+        master_logger.info "(#{@role.to_s}) Received SIGHUP. Shutting down."
         self.shutdown
       }
     end
 
     def shutdown
-      master_logger.info 'Received signal to shutdown. Stopping workers...'
-      # stop workers
-      @state = :closing
-      @workers.each do |pid|
-        Process.kill "TERM", pid
-      end
+      if @role == :master
+        master_logger.info 'Master received signal to shutdown. Stopping workers...'
+        # stop workers
+        @state = :stopping
+        @workers.each do |pid|
+          Process.kill "TERM", pid
+        end
 
-      # wait for them to close
-      Process.waitall
-      master_logger.info 'Workers stopped. Exiting.'
-      delete_pid_file
-      exit
+        # wait for them to close
+        Process.waitall
+        master_logger.info 'Workers stopped. Exiting.'
+        delete_pid_file
+        exit
+      else
+        # if worker, just set state and let loop end on its own cleanly
+        master_logger.info 'Worker received signal to shutdown. Preparing to stop cleanly.'
+        @state = :stopping
+      end
     end
 
     ## LOG HELPERS
