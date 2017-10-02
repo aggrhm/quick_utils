@@ -244,23 +244,23 @@ module QuickUtils
     def handle_signals
       Signal.trap("QUIT") {
         master_logger.info "(#{@role.to_s}) Received SIGQUIT. Shutting down."
-        self.shutdown
+        self.shutdown(signal: "SIGQUIT")
       }
       Signal.trap("INT") {
         master_logger.info "(#{@role.to_s}) Received SIGINT. Shutting down."
-        self.shutdown
+        self.shutdown(signal: "SIGINT")
       }
       Signal.trap("TERM") {
         master_logger.info "(#{@role.to_s}) Received SIGTERM. Shutting down."
-        self.shutdown
+        self.shutdown(signal: "SIGTERM")
       }
       Signal.trap("HUP") { 
         master_logger.info "(#{@role.to_s}) Received SIGHUP. Shutting down."
-        self.shutdown
+        self.shutdown(signal: "SIGHUP")
       }
     end
 
-    def shutdown
+    def shutdown(opts={})
       if @role == :master
         master_logger.info 'Master received signal to shutdown. Stopping workers...'
         # stop workers
@@ -278,6 +278,9 @@ module QuickUtils
         # if worker, just set state and let loop end on its own cleanly
         master_logger.info 'Worker received signal to shutdown. Preparing to stop cleanly.'
         @state = :stopping
+        if @options[:raise_interrupt] == true
+          raise Interrupt.new(opts[:signal])
+        end
       end
     end
 
