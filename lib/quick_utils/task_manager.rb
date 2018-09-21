@@ -30,10 +30,24 @@ module QuickUtils
       @options = {:worker_count => 1, :environment => :development, :delay => 5, :root_dir => Dir.pwd, :daemon => true}
       class << @options
         def add_task(int_num, int_units, &task)
+          add_named_task(nil, int_num, int_units, &task)
+        end
+
+        def add_named_task(name, int_num, int_units, &task)
           self[:tasks] ||= []
           interval = int_num * DURATIONS[int_units.to_sym]
-          self[:tasks] << {fn: task, interval: interval, last_run_at: nil, next_run_at: Time.now}
+          self[:tasks] << {name: name, fn: task, interval: interval, last_run_at: nil, next_run_at: Time.now}
+
         end
+
+        def before_task(&task)
+          self[:before_task] = task
+        end
+
+        def after_task(&task)
+          self[:after_task] = task
+        end
+
         def method_missing(m, *args)
           self[m.to_s.gsub('=', '').to_sym] = args[0]
         end
@@ -219,6 +233,9 @@ module QuickUtils
       self.logger.info "Starting #{@process_name} task manager for #{@options[:environment]}"
 
       # loop ready tasks
+      before_task = @options[:before_task]
+      after_task = @options[:after_task]
+      log_tasks = @options[:log_task_scheduling] == true
       loop do
         if @state != :running
           master_logger.info "Stopping run loop cleanly..."
@@ -227,7 +244,11 @@ module QuickUtils
         tasks.each do |task|
           if task[:next_run_at] < Time.now
             begin
+              self.logger.info("Starting task #{task[:name]}.") if log_tasks
+              before_task.call(self, task) if !before_task.nil?
               task[:fn].call(self)
+              after_task.call(self, task) if !after_task.nil?
+              self.logger.info("Finished task #{task[:name]}.") if log_tasks
             rescue => e
               logger.info e.message
               logger.info e.backtrace.join("\n\t")
