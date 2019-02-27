@@ -65,9 +65,15 @@ module QuickUtils
     def master_logger
       @master_logger ||= Logger.new(self.out_log_file, 1, 1024*1024)
     end
+    def master_logger=(val)
+      @master_logger = val
+    end
 
     def logger
       @logger ||= Logger.new(self.log_file, 1, 1024*1024)
+    end
+    def logger=(val)
+      @logger = val
     end
 
     def state
@@ -109,6 +115,11 @@ module QuickUtils
       @args = optparse.parse!(args.empty? ? ['-h'] : args)
 
       # additional opts
+      if @options[:log_stdout] == true
+        @options[:logger] = @options[:master_logger] = Logger.new(STDOUT)
+      end
+      self.logger = @options[:logger] if @options[:logger]
+      self.master_logger = @options[:master_logger] if @options[:master_logger]
       @options[:pid_dir] ||= File.join(@options[:root_dir], 'tmp', 'pids')
       @options[:log_dir] ||= File.join(@options[:root_dir], 'log')
 
@@ -132,6 +143,9 @@ module QuickUtils
 
     def run
       @state = :running
+      # set global logger
+      $logger = logger
+
       # load rails
       self.load_rails if @options[:load_rails]
 
