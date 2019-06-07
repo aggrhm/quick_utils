@@ -40,6 +40,10 @@ module QuickUtils
 
         end
 
+        def before_run(&task)
+          self[:before_run] = task
+        end
+
         def before_task(&task)
           self[:before_task] = task
         end
@@ -142,12 +146,17 @@ module QuickUtils
     end
 
     def run
-      @state = :running
       # set global logger
       $logger = logger
 
       # load rails
       self.load_rails if @options[:load_rails]
+
+      if @options[:before_run]
+        @options[:before_run].call(self)
+      end
+
+      @state = :running
 
       if @options[:tasks]
         self.run_tasks(@options[:tasks])
