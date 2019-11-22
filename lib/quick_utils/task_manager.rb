@@ -27,7 +27,13 @@ module QuickUtils
       @workers = []
       @role = :master
       @state = :starting
-      @options = {:worker_count => 1, :environment => :development, :delay => 5, :root_dir => Dir.pwd, :daemon => true}
+      @options = {
+        :worker_count => 1,
+        :environment => (ENV['RAILS_ENV'] || ENV['RAKE_ENV'] || 'development'),
+        :delay => 5,
+        :root_dir => Dir.pwd,
+        :daemon => true
+      }
       class << @options
         def add_task(int_num, int_units, &task)
           add_named_task(nil, int_num, int_units, &task)
