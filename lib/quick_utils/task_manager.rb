@@ -22,6 +22,8 @@ module QuickUtils
       return t
     end
 
+    attr_accessor :logger, :master_logger
+
     def initialize(name, args = ARGV, &block)
       @process_name = name
       @workers = []
@@ -63,27 +65,14 @@ module QuickUtils
         end
       end
       block.call(@options) if block
-      self.process_options(args)
+      process_options(args)
+      prepare_loggers
     end
 
     ## ACCESSORS
     
     def options
       @options
-    end
-
-    def master_logger
-      @master_logger ||= Logger.new(self.out_log_file, 1, 1024*1024)
-    end
-    def master_logger=(val)
-      @master_logger = val
-    end
-
-    def logger
-      @logger ||= Logger.new(self.log_file, 1, 1024*1024)
-    end
-    def logger=(val)
-      @logger = val
     end
 
     def state
@@ -109,12 +98,14 @@ module QuickUtils
         end
         opts.on('-v', '--verbose', "Turn on verbose mode") do
           @options[:verbose] = true
+          @options[:log_level] = :debug
         end
         opts.on('-d', '--delay=D', "Delay between rounds of work (seconds)") do |d|
           @options[:delay] = d
         end
         opts.on('-t', '--test', "Run in test mode") do
           @options[:test_mode] = @options[:debug] = true
+          @options[:log_level] = :debug
         end
         opts.on('-D', '--no-daemon', "Run in foreground") do
           @options[:daemon] = false
@@ -128,11 +119,17 @@ module QuickUtils
       if @options[:log_stdout] == true
         @options[:logger] = @options[:master_logger] = Logger.new(STDOUT)
       end
-      self.logger = @options[:logger] if @options[:logger]
-      self.master_logger = @options[:master_logger] if @options[:master_logger]
       @options[:pid_dir] ||= File.join(@options[:root_dir], 'tmp', 'pids')
       @options[:log_dir] ||= File.join(@options[:root_dir], 'log')
 
+    end
+
+    def prepare_loggers
+      self.logger = @options[:logger] || Logger.new(self.log_file, 1, 1024*1024)
+      self.logger.level = @options[:log_level] || :info
+
+      self.master_logger = @options[:master_logger] || Logger.new(self.out_log_file, 1, 1024*1024)
+      self.master_logger.level = @options[:log_level] || :info
     end
 
     def load_rails
